@@ -27,8 +27,8 @@ exports.init = function(_player, _logger, callback) {
     player = _player;
     logger = _logger;
 
-    if (!player.app) {
-        callback('module must be initialized after expressjs module!');
+    if (!player.plugins['plugin-express']) {
+        callback('module must be initialized after express module!');
     } else {
         player.app.get('/queue', function(req, res) {
             res.send(JSON.stringify(player.queue));
