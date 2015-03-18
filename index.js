@@ -5,6 +5,7 @@ var MODULE_NAME = 'plugin-rest';
 var path = require('path');
 var _ = require('underscore');
 var socketio = require('socket.io');
+var bodyParser = require('body-parser');
 
 var nodeplayerConfig = require('nodeplayer-config');
 var coreConfig = nodeplayerConfig.getConfig();
