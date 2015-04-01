@@ -156,7 +156,7 @@ exports.onBackendInitialized = function(backendName) {
             //}
         }
 
-        logger.verbose('got streaming request for song: ' + songID + ', range: ' + range);
+        logger.debug('got streaming request for song: ' + songID + ', range: ' + range);
 
         var doSend = function(offset) {
             var m = meter();
@@ -200,21 +200,30 @@ exports.onBackendInitialized = function(backendName) {
                     });
                     sendStream.pipe(m).pipe(res, {end: false});
 
-                    // end of file hit, run doSend again with new offset
                     m.on('end', function() {
+                        logger.silly('eof hit, running doSend again with new offset');
+
                         // close old pipes
                         sendStream.unpipe();
                         m.unpipe();
 
                         sendStream.close();
 
-                        // this is needed currently because otherwise we leak events
+                        // res will be reused in doSend, avoid event listener leak
                         res.removeListener('close', sendStream.close);
+                        res.removeListener('finish', sendStream.close);
 
                         doSend(m.bytes + offset);
                     });
-                    // client disconnected before end of file, close file
-                    res.on('close', sendStream.close);
+
+                    res.on('close', function() {
+                        logger.silly('client closed connection, closing sendStream');
+                        sendStream.close();
+                    });
+                    res.on('finish', function() {
+                        logger.silly('response finished, closing sendStream');
+                        sendStream.close();
+                    });
                 }
             } else {
                 logger.verbose('file not found: ' + path);
