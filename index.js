@@ -38,7 +38,12 @@ exports.init = function(_player, _logger, callback) {
         // TODO: get rid of the partyplay specific userID here
         // queue song
         player.app.post('/queue', bodyParser.json({limit: '100mb'}), function(req, res) {
-            var err = player.addToQueue(req.body.songs, req.body.pos);
+            var err;
+            if (req.body.method === 'move') {
+                err = player.moveInQueue(req.body.from, req.body.to, req.body.cnt);
+            } else {
+                err = player.addToQueue(req.body.songs, req.body.pos);
+            }
             sendResponse(res, 'success', err);
         });
 
