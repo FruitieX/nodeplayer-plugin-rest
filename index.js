@@ -35,10 +35,13 @@ exports.init = function(_player, _logger, callback) {
             res.send(JSON.stringify(player.queue));
         });
 
-        // TODO: get rid of the partyplay specific userID here
         // queue song
         player.app.post('/queue/add', bodyParser.json({limit: '100mb'}), function(req, res) {
             var err = player.addToQueue(req.body.songs, req.body.pos);
+            sendResponse(res, 'success', err);
+        });
+        player.app.post('/queue/move/:pos', bodyParser.json({limit: '100mb'}), function(req, res) {
+            var err = player.moveInQueue(req.params.pos, req.body.to, req.body.cnt);
             sendResponse(res, 'success', err);
         });
 
@@ -200,6 +203,15 @@ exports.onBackendInitialized = function(backendName) {
                     });
                     sendStream.pipe(m).pipe(res, {end: false});
 
+                    var closeStream = function() {
+                        logger.silly('client closed connection, closing sendStream');
+                        sendStream.close();
+                    };
+                    var finishStream = function() {
+                        logger.silly('response finished, closing sendStream');
+                        sendStream.close();
+                    };
+
                     m.on('end', function() {
                         logger.silly('eof hit, running doSend again with new offset');
 
@@ -210,20 +222,14 @@ exports.onBackendInitialized = function(backendName) {
                         sendStream.close();
 
                         // res will be reused in doSend, avoid event listener leak
-                        res.removeListener('close', sendStream.close);
-                        res.removeListener('finish', sendStream.close);
+                        res.removeListener('close', closeStream);
+                        res.removeListener('finish', finishStream);
 
                         doSend(m.bytes + offset);
                     });
 
-                    res.on('close', function() {
-                        logger.silly('client closed connection, closing sendStream');
-                        sendStream.close();
-                    });
-                    res.on('finish', function() {
-                        logger.silly('response finished, closing sendStream');
-                        sendStream.close();
-                    });
+                    res.on('close', closeStream);
+                    res.on('finish', finishStream);
                 }
             } else {
                 logger.verbose('file not found: ' + path);
