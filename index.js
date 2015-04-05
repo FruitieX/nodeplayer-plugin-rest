@@ -37,12 +37,12 @@ exports.init = function(_player, _logger, callback) {
 
         // TODO: get rid of the partyplay specific userID here
         // queue song
-        player.app.post('/queue', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.post('/queue/add', bodyParser.json({limit: '100mb'}), function(req, res) {
             var err = player.addToQueue(req.body.songs, req.body.pos);
             sendResponse(res, 'success', err);
         });
 
-        player.app.delete('/queue/:pos', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.delete('/queue/del/:pos', bodyParser.json({limit: '100mb'}), function(req, res) {
             var songs = player.removeFromQueue(req.params.pos, req.body.cnt);
             sendResponse(res, songs, null);
         });
