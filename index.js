@@ -37,16 +37,26 @@ exports.init = function(_player, _logger, callback) {
 
         // queue song
         player.app.post('/queue/add', bodyParser.json({limit: '100mb'}), function(req, res) {
-            var err = player.addToQueue(req.body.songs, req.body.pos);
+            var err = player.addToQueue(
+                req.body.songs,
+                parseInt(req.body.pos)
+            );
             sendResponse(res, 'success', err);
         });
         player.app.post('/queue/move/:pos', bodyParser.json({limit: '100mb'}), function(req, res) {
-            var err = player.moveInQueue(req.params.pos, req.body.to, req.body.cnt);
+            var err = player.moveInQueue(
+                parseInt(req.params.pos),
+                parseInt(req.body.to),
+                parseInt(req.body.cnt)
+            );
             sendResponse(res, 'success', err);
         });
 
         player.app.delete('/queue/del/:pos', bodyParser.json({limit: '100mb'}), function(req, res) {
-            var songs = player.removeFromQueue(req.params.pos, req.body.cnt);
+            var songs = player.removeFromQueue(
+                parseInt(req.params.pos),
+                parseInt(req.body.cnt)
+            );
             sendResponse(res, songs, null);
         });
 
@@ -55,11 +65,11 @@ exports.init = function(_player, _logger, callback) {
             var cnt = req.body.cnt;
 
             if (action === 'play') {
-                player.startPlayback(req.body.position);
+                player.startPlayback(parseInt(req.body.position));
             } else if (action === 'pause') {
                 player.pausePlayback();
             } else if (action === 'skip') {
-                player.skipSongs(cnt);
+                player.skipSongs(parseInt(cnt));
             } else if (action === 'shuffle') {
                 player.shuffleQueue();
             }
@@ -67,7 +77,7 @@ exports.init = function(_player, _logger, callback) {
             res.send('success');
         });
         player.app.post('/volume', bodyParser.json({limit: '100mb'}), function(req, res) {
-            player.setVolume(req.body);
+            player.setVolume(parseInt(req.body));
             res.send('success');
         });
 
