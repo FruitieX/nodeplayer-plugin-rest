@@ -6,7 +6,6 @@ var path = require('path');
 var fs = require('fs');
 var _ = require('underscore');
 var meter = require('stream-meter');
-var bodyParser = require('body-parser');
 
 var nodeplayerConfig = require('nodeplayer').config;
 var coreConfig = nodeplayerConfig.getConfig();
@@ -36,14 +35,14 @@ exports.init = function(_player, _logger, callback) {
         });
 
         // queue song
-        player.app.post('/queue/add', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.post('/queue/add', function(req, res) {
             var err = player.addToQueue(
                 req.body.songs,
                 parseInt(req.body.pos)
             );
             sendResponse(res, 'success', err);
         });
-        player.app.post('/queue/move/:pos', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.post('/queue/move/:pos', function(req, res) {
             var err = player.moveInQueue(
                 parseInt(req.params.pos),
                 parseInt(req.body.to),
@@ -52,7 +51,7 @@ exports.init = function(_player, _logger, callback) {
             sendResponse(res, 'success', err);
         });
 
-        player.app.delete('/queue/del/:pos', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.delete('/queue/del/:pos', function(req, res) {
             var songs = player.removeFromQueue(
                 parseInt(req.params.pos),
                 parseInt(req.body.cnt)
@@ -60,7 +59,7 @@ exports.init = function(_player, _logger, callback) {
             sendResponse(res, songs, null);
         });
 
-        player.app.post('/playctl', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.post('/playctl', function(req, res) {
             var action = req.body.action;
             var cnt = req.body.cnt;
 
@@ -76,13 +75,13 @@ exports.init = function(_player, _logger, callback) {
 
             res.send('success');
         });
-        player.app.post('/volume', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.post('/volume', function(req, res) {
             player.setVolume(parseInt(req.body));
             res.send('success');
         });
 
         // search for song with given search terms
-        player.app.post('/search', bodyParser.json({limit: '100mb'}), function(req, res) {
+        player.app.post('/search', function(req, res) {
             logger.verbose('got search request: ' + req.body.terms);
 
             player.searchBackends(req.body, function(results) {
