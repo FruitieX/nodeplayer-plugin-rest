@@ -2,10 +2,7 @@
 
 var MODULE_NAME = 'plugin-rest';
 
-var path = require('path');
-var fs = require('fs');
 var _ = require('underscore');
-var meter = require('stream-meter');
 
 var nodeplayerConfig = require('nodeplayer').config;
 var coreConfig = nodeplayerConfig.getConfig();
@@ -93,159 +90,92 @@ exports.init = function(_player, _logger, callback) {
     }
 };
 
-var pendingReqHandlers = [];
-exports.onPrepareProgress = function(song, dataSize, done) {
-    for (var i = pendingReqHandlers.length - 1; i >= 0; i--) {
-        pendingReqHandlers.pop()();
+var pendingRequests = {};
+exports.onPrepareProgress = function(song, chunk, done) {
+    if (!pendingRequests[song.backendName]) {
+        return;
     }
-};
 
-var getFilesizeInBytes = function(filename) {
-    if (fs.existsSync(filename)) {
-        var stats = fs.statSync(filename);
-        var fileSizeInBytes = stats.size;
-        return fileSizeInBytes;
-    } else {
-        return -1;
-    }
-};
-
-var getPath = function(player, songID, backendName, songFormat) {
-    if (player.songsPreparing[backendName] &&
-            player.songsPreparing[backendName][songID]) {
-        return coreConfig.songCachePath + '/' + backendName +
-            '/incomplete/' + songID + '.' + songFormat;
-    } else {
-        return coreConfig.songCachePath + '/' + backendName +
-            '/' + songID + '.' + songFormat;
-    }
+    _.each(pendingRequests[song.backendName][song.songID], function(res) {
+        if (chunk) {
+            res.write(chunk);
+        }
+        if (done) {
+            res.end();
+            pendingRequests[song.backendName][song.songID] = [];
+        }
+    });
 };
 
 exports.onBackendInitialized = function(backendName) {
-    // expressjs middleware for requesting music data
-    // must support ranges in the req, and send the data to res
+    pendingRequests[backendName] = {};
+
+    // provide API path for music data, might block while song is preparing
     player.app.get('/song/' + backendName + '/:fileName', function(req, res, next) {
         var songID = req.params.fileName.substring(0, req.params.fileName.lastIndexOf('.'));
         var songFormat = req.params.fileName.substring(req.params.fileName.lastIndexOf('.') + 1);
 
-        // try finding out length of song
-        var song = player.searchQueue(backendName, songID);
-        if (song) {
-            res.setHeader('X-Content-Duration', song.duration / 1000);
-        }
-
-        res.setHeader('Transfer-Encoding', 'chunked');
-        res.setHeader('Content-Type', 'audio/ogg; codecs=opus');
-        //res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Accept-Ranges', 'bytes');
-        //res.setHeader('Connection', 'keep-alive');
-
-        var range = [0];
-        if (req.headers.range) {
-            range = req.headers.range.substr(req.headers.range.indexOf('=') + 1).split('-');
-            // TODO: only 206 used right now
-            //if (range[0] != 0 || range[1]) {
-            // try guessing at least some length for the song to keep chromium happy
-            res.statusCode = 206;
-            var path = getPath(player, songID, backendName, songFormat);
-            var fileSize = getFilesizeInBytes(path);
-
-            // a best guess for the header
-            var end;
-            if (range[1]) {
-                end = Math.min(range[1], fileSize - 1);
-            } else {
-                end = fileSize - 1;
-            }
-
-            // total file size, if known
-            var outOf = '*';
-            if (!player.songsPreparing[backendName] ||
-                    !player.songsPreparing[backendName][songID]) {
-                outOf = fileSize;
-            }
-            res.setHeader('Content-Range', 'bytes ' + range[0] + '-' + end + '/' + outOf);
-            //}
-        }
-
-        logger.debug('got streaming request for song: ' + songID + ', range: ' + range);
-
-        var doSend = function(offset) {
-            var m = meter();
-
-            // TODO: this may have race condition issues causing the end of a song to be cut out
-            var path = getPath(player, songID, backendName, songFormat);
-
-            if (fs.existsSync(path)) {
-                var end;
-                if (range[1]) {
-                    end = Math.min(range[1], getFilesizeInBytes(path) - 1);
-                } else {
-                    end = getFilesizeInBytes(path) - 1;
-                }
-
-                if (offset > end) {
-                    if (range[1] && range[1] <= offset) {
-                        // range request was fullfilled
-                        res.end();
-                    } else if (player.songsPreparing[backendName] &&
-                            player.songsPreparing[backendName][songID]) {
-                        // song is still preparing, there is more data to come
-                        logger.debug('enough data not yet available at: ' + path);
-                        pendingReqHandlers.push(function() {
-                            doSend(offset);
-                        });
-                    } else if ((getFilesizeInBytes(path) - 1) <= offset) {
-                        // song fully prepared and sent
-                        res.end();
-                    } else {
-                        // bad range
-                        res.status(416).end();
-                    }
-                } else {
-                    // data is available, let's send as much as we can
-                    // TODO: would it maybe be better to open the file once per
-                    // request and then seek...
-                    var sendStream = fs.createReadStream(path, {
-                        start: offset,
-                        end: end
-                    });
-                    sendStream.pipe(m).pipe(res, {end: false});
-
-                    var closeStream = function() {
-                        logger.silly('client closed connection, closing sendStream');
-                        sendStream.close();
-                    };
-                    var finishStream = function() {
-                        logger.silly('response finished, closing sendStream');
-                        sendStream.close();
-                    };
-
-                    m.on('end', function() {
-                        logger.silly('eof hit, running doSend again with new offset');
-
-                        // close old pipes
-                        sendStream.unpipe();
-                        m.unpipe();
-
-                        sendStream.close();
-
-                        // res will be reused in doSend, avoid event listener leak
-                        res.removeListener('close', closeStream);
-                        res.removeListener('finish', finishStream);
-
-                        doSend(m.bytes + offset);
-                    });
-
-                    res.on('close', closeStream);
-                    res.on('finish', finishStream);
-                }
-            } else {
-                logger.verbose('file not found: ' + path);
-                res.status(404).end();
-            }
+        var song = {
+            songID: songID,
+            format: songFormat
         };
 
-        doSend(parseInt(range[0]));
+        if (player.backends[backendName].isPrepared(song)) {
+            // song should be available on disk
+            res.sendFile('/' + backendName + '/' + songID + '.' + songFormat, {
+                root: coreConfig.songCachePath
+            });
+        } else if (player.songsPreparing[backendName] &&
+                player.songsPreparing[backendName][songID]) {
+            // song is preparing
+            var preparingSong = player.songsPreparing[backendName][songID];
+
+            // try finding out length of song
+            var queuedSong = player.searchQueue(backendName, songID);
+            if (queuedSong) {
+                res.setHeader('X-Content-Duration', queuedSong.duration / 1000);
+            }
+
+            res.setHeader('Transfer-Encoding', 'chunked');
+            res.setHeader('Content-Type', 'audio/ogg; codecs=opus');
+            res.setHeader('Accept-Ranges', 'bytes');
+
+            var range = [0];
+            if (req.headers.range) {
+                // partial request
+
+                range = req.headers.range.substr(req.headers.range.indexOf('=') + 1).split('-');
+                res.statusCode = 206;
+
+                // a best guess for the header
+                var end;
+                var dataLen = preparingSong.songData ? preparingSong.songData.length : 0;
+                if (range[1]) {
+                    end = Math.min(range[1], dataLen - 1);
+                } else {
+                    end = dataLen - 1;
+                }
+
+                // TODO: we might be lying here if the code below sends whole song
+                res.setHeader('Content-Range', 'bytes ' + range[0] + '-' + end + '/*');
+            }
+
+            // TODO: we can be smarter here: currently most corner cases lead to sending entire
+            // song even if only part of it was requested. Also the range end is currently ignored
+
+            // skip to start of requested range if we have enough data, otherwise serve whole song
+            if (range[0] < preparingSong.songData.length) {
+                res.write(preparingSong.songData.slice(range[0]));
+            } else {
+                res.write(preparingSong.songData);
+            }
+
+            pendingRequests[backendName][song.songID] =
+                pendingRequests[backendName][song.songID] || [];
+
+            pendingRequests[backendName][song.songID].push(res);
+        } else {
+            res.status(404).end('404 song not found');
+        }
     });
 };

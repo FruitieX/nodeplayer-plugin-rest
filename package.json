@@ -17,9 +17,7 @@
   },
   "homepage": "https://github.com/FruitieX/nodeplayer-plugin-rest",
   "dependencies": {
-    "body-parser": "^1.12.2",
     "nodeplayer": "*",
-    "stream-meter": "^1.0.3",
     "underscore": "^1.8.2"
   },
   "devDependencies": {
