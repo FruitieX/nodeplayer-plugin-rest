@@ -1,6 +1,6 @@
 {
   "name": "nodeplayer-plugin-rest",
-  "version": "0.1.99999",
+  "version": "0.2.0",
   "description": "Serves nodeplayer API hooks via a REST API",
   "main": "index.js",
   "scripts": {
