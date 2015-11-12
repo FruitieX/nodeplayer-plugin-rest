@@ -31,6 +31,12 @@ exports.init = function(_player, _logger, callback) {
             res.send(JSON.stringify(player.queue));
         });
 
+        player.app.get('/playlist/all', function(req, res) {
+            player.getPlaylists(function(playlists) {
+                res.send(playlists);
+            });
+        });
+
         // queue song
         player.app.post('/queue/add', function(req, res) {
             var err = player.addToQueue(
