@@ -24,14 +24,19 @@ exports.init = function(_player, _logger, callback) {
                 if (err) {
                     res.status(404).send(err);
                 } else {
-                    res.send(data);
+                    res.send(data || 'ok');
                 }
             };
             next();
         });
 
         player.app.get('/playlist', function(req, res) {
-            res.json(player.playlist);
+            res.json({
+                playlist: player.playlist,
+                curPlaylistPos: player.curPlaylistPos,
+                curSongPos: player.playbackStart ?
+                    (new Date().getTime() - player.playbackStart) : null
+            });
         });
 
         player.app.post('/playlist/song', function(req, res) {
