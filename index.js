@@ -86,12 +86,12 @@ exports.init = function(_player, _logger, callback) {
             res.send('success');
         });
 
-        // search for song with given search terms
-        player.app.post('/search', function(req, res) {
-            logger.verbose('got search request: ' + req.body.terms);
+        // search for songs, search terms in query params
+        player.app.get('/search', function(req, res) {
+            logger.verbose('got search request: ' + req.query);
 
-            player.searchBackends(req.body, function(results) {
-                res.send(JSON.stringify(results));
+            player.searchBackends(req.query, function(results) {
+                res.json(results);
             });
         });
 
