@@ -10,14 +10,6 @@ var coreConfig = nodeplayerConfig.getConfig();
 var player;
 var logger;
 
-var sendResponse = function(res, msg, err) {
-    if (err) {
-        res.status(404).send(err);
-    } else {
-        res.send(msg);
-    }
-};
-
 // called when nodeplayer is started to initialize the backend
 // do any necessary initialization here
 exports.init = function(_player, _logger, callback) {
@@ -27,24 +19,34 @@ exports.init = function(_player, _logger, callback) {
     if (!player.plugins.express) {
         callback('module must be initialized after express module!');
     } else {
-        player.app.get('/queue', function(req, res) {
-            res.send(JSON.stringify(player.queue));
+        player.app.use(function(req, res, next) {
+            res.sendRes = function(err, data) {
+                if (err) {
+                    res.status(404).send(err);
+                } else {
+                    res.send(data || 'ok');
+                }
+            };
+            next();
         });
 
-        player.app.get('/playlist/all', function(req, res) {
-            player.getPlaylists(function(playlists) {
-                res.send(playlists);
+        player.app.get('/playlist', function(req, res) {
+            res.json({
+                playlist: player.playlist,
+                curPlaylistPos: player.curPlaylistPos,
+                curSongPos: player.playbackStart ?
+                    (new Date().getTime() - player.playbackStart) : null
             });
         });
 
-        // queue song
-        player.app.post('/queue/add', function(req, res) {
-            var err = player.addToQueue(
-                req.body.songs,
-                parseInt(req.body.pos)
-            );
-            sendResponse(res, 'success', err);
+        player.app.post('/playlist/song', function(req, res) {
+            player.insertSongs(-1, req.body, res.sendRes);
         });
+        player.app.post('/playlist/song/:at', function(req, res) {
+            player.insertSongs(req.params.at, req.body, res.sendRes);
+        });
+
+        /*
         player.app.post('/queue/move/:pos', function(req, res) {
             var err = player.moveInQueue(
                 parseInt(req.params.pos),
@@ -53,31 +55,32 @@ exports.init = function(_player, _logger, callback) {
             );
             sendResponse(res, 'success', err);
         });
+        */
 
-        player.app.delete('/queue/del/:pos', function(req, res) {
-            var songs = player.removeFromQueue(
-                parseInt(req.params.pos),
-                parseInt(req.body.cnt)
-            );
-            sendResponse(res, songs, null);
+        player.app.delete('/playlist/song/:at', function(req, res) {
+            player.removeSongs(req.params.at, parseInt(req.body.cnt) || 1, res.sendRes);
         });
 
-        player.app.post('/playctl', function(req, res) {
-            var action = req.body.action;
-            var cnt = req.body.cnt;
-
-            if (action === 'play') {
-                player.startPlayback(parseInt(req.body.position));
-            } else if (action === 'pause') {
-                player.pausePlayback();
-            } else if (action === 'skip') {
-                player.skipSongs(parseInt(cnt));
-            } else if (action === 'shuffle') {
-                player.shuffleQueue();
-            }
-
-            res.send('success');
+        player.app.post('/playctl/:play', function(req, res) {
+            player.startPlayback(parseInt(req.body.position) || 0);
+            res.sendRes(null, 'ok');
         });
+
+        player.app.post('/playctl/:pause', function(req, res) {
+            player.pausePlayback();
+            res.sendRes(null, 'ok');
+        });
+
+        player.app.post('/playctl/:skip', function(req, res) {
+            player.skipSongs(parseInt(req.body.cnt));
+            res.sendRes(null, 'ok');
+        });
+
+        player.app.post('/playctl/:shuffle', function(req, res) {
+            player.shuffleQueue();
+            res.sendRes(null, 'ok');
+        });
+
         player.app.post('/volume', function(req, res) {
             player.setVolume(parseInt(req.body));
             res.send('success');
