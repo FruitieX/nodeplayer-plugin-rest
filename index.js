@@ -35,10 +35,11 @@ exports.init = function(_player, _logger, callback) {
                 playlist: player.playlist,
                 curPlaylistPos: player.curPlaylistPos,
                 curSongPos: player.playbackStart ?
-                    (new Date().getTime() - player.playbackStart) : null
+                    (new Date().getTime() - player.playbackStart) : -1
             });
         });
 
+        // TODO: error handling
         player.app.post('/playlist/song', function(req, res) {
             player.insertSongs(-1, req.body, res.sendRes);
         });
@@ -58,7 +59,7 @@ exports.init = function(_player, _logger, callback) {
         */
 
         player.app.delete('/playlist/song/:at', function(req, res) {
-            player.removeSongs(req.params.at, parseInt(req.body.cnt) || 1, res.sendRes);
+            player.removeSongs(req.params.at, parseInt(req.query.cnt) || 1, res.sendRes);
         });
 
         player.app.post('/playctl/:play', function(req, res) {

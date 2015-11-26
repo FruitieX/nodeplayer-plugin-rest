@@ -57,9 +57,8 @@ Returns:
 POST data:
 ```
 {
-    playlist: [Song],
-    curPlaylistPos: Number,
-    curSongPos: Number
+    playlistId: String,
+    backendName: String
 }
 ```
 
