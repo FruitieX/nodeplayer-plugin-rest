@@ -116,6 +116,7 @@ Status
 Parameters:
 ```
 :at (String) - UUID of song to delete at ('-1' = start of playlist)
+```
 
 Query params:
 ```
@@ -125,6 +126,7 @@ Query params:
 Returns:
 
 Song with UUID ':at' not found: `Status 404 Not Found`
+
 ```
 Status
 ```
