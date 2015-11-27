@@ -30,20 +30,20 @@ exports.init = function(_player, _logger, callback) {
             next();
         });
 
-        player.app.get('/playlist', function(req, res) {
+        player.app.get('/queue', function(req, res) {
             res.json({
-                playlist: player.playlist,
-                curPlaylistPos: player.curPlaylistPos,
-                curSongPos: player.playbackStart ?
-                    (new Date().getTime() - player.playbackStart) : -1
+                songs: player.queue.songs,
+                curQueuePos: player.queue.curQueuePos,
+                curSongPos: player.queue.playbackStart ?
+                    (new Date().getTime() - player.queue.playbackStart) : -1
             });
         });
 
         // TODO: error handling
-        player.app.post('/playlist/song', function(req, res) {
+        player.app.post('/queue/song', function(req, res) {
             player.insertSongs(-1, req.body, res.sendRes);
         });
-        player.app.post('/playlist/song/:at', function(req, res) {
+        player.app.post('/queue/song/:at', function(req, res) {
             player.insertSongs(req.params.at, req.body, res.sendRes);
         });
 
@@ -58,7 +58,7 @@ exports.init = function(_player, _logger, callback) {
         });
         */
 
-        player.app.delete('/playlist/song/:at', function(req, res) {
+        player.app.delete('/queue/song/:at', function(req, res) {
             player.removeSongs(req.params.at, parseInt(req.query.cnt) || 1, res.sendRes);
         });
 
