@@ -7,19 +7,16 @@ var _ = require('underscore');
 var nodeplayerConfig = require('nodeplayer').config;
 var coreConfig = nodeplayerConfig.getConfig();
 
-var player;
-var logger;
-
 // called when nodeplayer is started to initialize the backend
 // do any necessary initialization here
-exports.init = function(_player, _logger, callback) {
-    player = _player;
-    logger = _logger;
-
-    if (!player.plugins.express) {
+exports.init = function(vars, callback) {
+    if (!vars.app) {
         callback('module must be initialized after express module!');
     } else {
-        player.app.use(function(req, res, next) {
+        // TODO: include configured API paths here?
+        vars.rest = true;
+
+        vars.app.use(function(req, res, next) {
             res.sendRes = function(err, data) {
                 if (err) {
                     res.status(404).send(err);
@@ -30,7 +27,7 @@ exports.init = function(_player, _logger, callback) {
             next();
         });
 
-        player.app.get('/queue', function(req, res) {
+        vars.app.get('/queue', function(req, res) {
             res.json({
                 songs: player.queue.songs,
                 curQueuePos: player.queue.curQueuePos,
@@ -40,10 +37,10 @@ exports.init = function(_player, _logger, callback) {
         });
 
         // TODO: error handling
-        player.app.post('/queue/song', function(req, res) {
+        vars.app.post('/queue/song', function(req, res) {
             player.insertSongs(-1, req.body, res.sendRes);
         });
-        player.app.post('/queue/song/:at', function(req, res) {
+        vars.app.post('/queue/song/:at', function(req, res) {
             player.insertSongs(req.params.at, req.body, res.sendRes);
         });
 
@@ -58,37 +55,37 @@ exports.init = function(_player, _logger, callback) {
         });
         */
 
-        player.app.delete('/queue/song/:at', function(req, res) {
+        vars.app.delete('/queue/song/:at', function(req, res) {
             player.removeSongs(req.params.at, parseInt(req.query.cnt) || 1, res.sendRes);
         });
 
-        player.app.post('/playctl/:play', function(req, res) {
+        vars.app.post('/playctl/:play', function(req, res) {
             player.startPlayback(parseInt(req.body.position) || 0);
             res.sendRes(null, 'ok');
         });
 
-        player.app.post('/playctl/:pause', function(req, res) {
+        vars.app.post('/playctl/:pause', function(req, res) {
             player.pausePlayback();
             res.sendRes(null, 'ok');
         });
 
-        player.app.post('/playctl/:skip', function(req, res) {
+        vars.app.post('/playctl/:skip', function(req, res) {
             player.skipSongs(parseInt(req.body.cnt));
             res.sendRes(null, 'ok');
         });
 
-        player.app.post('/playctl/:shuffle', function(req, res) {
+        vars.app.post('/playctl/:shuffle', function(req, res) {
             player.shuffleQueue();
             res.sendRes(null, 'ok');
         });
 
-        player.app.post('/volume', function(req, res) {
+        vars.app.post('/volume', function(req, res) {
             player.setVolume(parseInt(req.body));
             res.send('success');
         });
 
         // search for songs, search terms in query params
-        player.app.get('/search', function(req, res) {
+        vars.app.get('/search', function(req, res) {
             logger.verbose('got search request: ' + req.query);
 
             player.searchBackends(req.query, function(results) {
@@ -121,7 +118,7 @@ exports.onBackendInitialized = function(backendName) {
     pendingRequests[backendName] = {};
 
     // provide API path for music data, might block while song is preparing
-    player.app.get('/song/' + backendName + '/:fileName', function(req, res, next) {
+    vars.app.get('/song/' + backendName + '/:fileName', function(req, res, next) {
         var songID = req.params.fileName.substring(0, req.params.fileName.lastIndexOf('.'));
         var songFormat = req.params.fileName.substring(req.params.fileName.lastIndexOf('.') + 1);
 
